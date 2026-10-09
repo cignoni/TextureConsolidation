@@ -1,0 +1,8 @@
+# build trees
+/build*/
+/out/
+# IDE
+.vs/
+.vscode/
+*.user
+CMakeUserPresets.json
