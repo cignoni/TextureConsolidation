@@ -6,3 +6,5 @@
 .vscode/
 *.user
 CMakeUserPresets.json
+/demo_output/
+__pycache__/
