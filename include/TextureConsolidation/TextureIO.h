@@ -81,6 +81,10 @@ namespace MishaK
 
 	inline void WriteTexture( std::string fileName , const RegularGrid< 2 , Point< double , 3 > > &img )
 	{
+		// Create the output folder if it does not exist yet
+		std::filesystem::path folder = std::filesystem::path( fileName ).parent_path();
+		if( !folder.empty() ) std::filesystem::create_directories( folder );
+
 		unsigned char * pixels = new unsigned char[ img.resolution() * 3 ];
 		for( unsigned int j=0 , idx=0 ; j<img.res(1) ; j++ ) for( unsigned int i=0 ; i<img.res(0) ; i++ ) for( unsigned int k=0 ; k<3 ; k++ , idx++ )
 			pixels[idx] = static_cast< unsigned char >( std::min< double >( 255. , std::max< double >( 0. , img(i,img.res(1)-1-j)[k]*255. ) ) );
