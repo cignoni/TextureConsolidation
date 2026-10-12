@@ -59,7 +59,9 @@ A dataset is a folder with three parts:
                   "w2c": [ [...], [...], [...], [0, 0, 0, 1] ], "file_path": "images/0.png" }, ... ] }
   ```
   `w2c` is the 4×4 world-to-camera matrix, and `fx, fy, cx, cy` are the pinhole intrinsics in pixels.
-- **Images:** one rendering or photograph per camera, at the `file_path` given in `cameras.json` (relative to the folder of `cameras.json`).
+- **Images:** one rendering or photograph per camera, at the `file_path` given in `cameras.json` (relative to the folder of `cameras.json`). For example, the vase used in the [example run](#example-run) has 9 photographs:
+
+  <img src="docs/inputs.jpg" width="800" alt="The 9 input photographs of the example vase">
 
 Views are numbered `0 .. N-1` in the order of `cameras.json`. Files belonging to view `i` are named with a `%d` pattern, e.g. `backprojected/%d.png` means `backprojected/0.png`, `backprojected/1.png`, ...
 
@@ -85,6 +87,10 @@ build/TextureDomainStitching --in vase/mesh.ply vase/registered/%d.png --mask va
 ```
 
 The result is `vase/texture.png`. `vase/mesh.ply` refers to this texture, so you can view the textured vase in a third-party mesh viewer such as [MeshLab](https://www.meshlab.net/).
+
+Below, *Blended* is the confidence-weighted average of the back-projected photographs, without registration or stitching. Because the photographs do not align perfectly on the surface, edges appear doubled and blurred. *Ours* is the result of the three steps above. The bottom row shows close-ups of the two boxes.
+
+<img src="docs/comparison.jpg" width="800" alt="Blended back-projections and our result, with close-ups">
 
 ## Programs
 
