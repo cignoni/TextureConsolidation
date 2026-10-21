@@ -1,14 +1,17 @@
 # Texture Consolidation
 
-Code for the paper **Texture Consolidation of Generated Multi-View Renderings**.
+Code for the paper [**Texture Consolidation of Generated Multi-View Renderings**](https://TODO-paper-link).
 
-Given a texture-atlased triangle mesh and a few renderings or photographs of it with known cameras, the code produces a single seamless texture image. It has three steps:
+- **Input:** a texture-atlased triangle mesh, and a few renderings or photographs of it with known cameras.
+- **Output:** a single seamless texture image for the mesh.
+
+The code has three steps:
 
 | Step | Program | What it does |
 |---|---|---|
-| 1 | `BackProjection` | Projects each image onto the mesh, giving a texture and a confidence image per view (Sec. 6.1). |
-| 2 | `TextureFlow` | Registers the per-view textures to each other with optical flow on the surface (Sec. 6.2). |
-| 3 | `TextureDomainStitching` | Fuses the registered textures into one texture by gradient-domain stitching (Sec. 6.3). |
+| 1 | `BackProjection` | Projects each image onto the mesh, giving a texture and a confidence image per view. |
+| 2 | `TextureFlow` | Registers the per-view textures to each other with optical flow on the surface. |
+| 3 | `TextureDomainStitching` | Fuses the registered textures into one texture by gradient-domain stitching. |
 
 `TextureDomainStitching` is built from [TextureSignalProcessing](https://github.com/mkazhdan/TextureSignalProcessing).
 
@@ -46,7 +49,7 @@ cmake --build build --config Release
 
 vcpkg installs libpng, libjpeg and zlib automatically (see `vcpkg.json`). The programs are in `build/Release/`.
 
-If you prefer not to use vcpkg, you can install libpng, libjpeg and zlib yourself and tell CMake where they are, e.g. with `-DCMAKE_PREFIX_PATH=<folder containing the libraries>`. CMake finds them with its standard `find_package` modules. We have not tested this setup.
+If you prefer not to use vcpkg, you can install libpng, libjpeg and zlib yourself and tell CMake where they are, e.g. with `-DCMAKE_PREFIX_PATH=<folder containing the libraries>`. CMake finds them with its standard `find_package` modules.
 
 ## Data format
 
@@ -65,9 +68,9 @@ A dataset is a folder with three parts:
 
 Views are numbered `0 .. N-1` in the order of `cameras.json`. Files belonging to view `i` are named with a `%d` pattern, e.g. `backprojected/%d.png` means `backprojected/0.png`, `backprojected/1.png`, ...
 
-**Using your own data:** two things should be noted.
-- The default parameters of `TextureFlow` were tested on meshes with a surface area of about 5 (e.g. the example vase). The flow parameters depend on the size of the mesh, so scale your mesh (and the camera translations) to roughly that size.
-- `TextureDomainStitching` requires a clean texture atlas. Otherwise it may stop with errors such as "Bad components", or crash. In that case, regenerate the atlas, for example with [xatlas](https://github.com/jpcy/xatlas).
+**Using your own data:** 
+- The parameters of `TextureFlow` depend on the size of the mesh.
+- `TextureDomainStitching` requires a clean and connected texture atlas. Otherwise it may crash with errors (for example, "Bad components"). If this happens, fixing or regenerating the atlas usually helps.
 
 ## Example run
 
@@ -131,10 +134,14 @@ See the [TextureSignalProcessing documentation](https://github.com/mkazhdan/Text
 |---|---|
 | `--in <mesh> <texture pattern>` and `--mask <confidence pattern>` | the registered textures and confidences |
 | `--multi` | **required**: stitch multiple textures |
-| `--wType 1` | **required**: weight both the value and the gradient terms by confidence (Eq. 7) |
+| `--wType 1` | **required**: weight both the value and the gradient terms by confidence |
 | `--erode 1 --erodeEps 0.1` | recommended: ignore unreliable texels at chart boundaries |
 | `--gWeight` | gradient fitting weight ($\alpha_{gf}$), default `0.01` |
 | `--out` | output texture |
+
+## Acknowledgements
+
+The vase model and photographs used in the [example run](#example-run) are courtesy of Paolo Cignoni and Marco Callieri, [Visual Computing Laboratory, ISTI-CNR](https://vcg.isti.cnr.it/). We thank them for sharing this data and their code with us.
 
 ## Citation
 
