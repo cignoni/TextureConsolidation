@@ -77,7 +77,7 @@ Views are numbered `0 .. N-1` in the order of `cameras.json`. Files belonging to
 This example uses 9 photographs of a vase, with its mesh and cameras. Download and unpack the data:
 
 ```bash
-curl -L -o vase.zip https://github.com/hliuw/TextureConsolidation/releases/download/untagged-744bd3bf0bbe92dce324/vase.zip
+curl -L -o vase.zip https://github.com/hliuw/TextureConsolidation/releases/download/example-data/vase.zip
 unzip vase.zip
 ```
 
