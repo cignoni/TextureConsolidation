@@ -92,9 +92,9 @@ build/TextureFlow --mesh vase/mesh.ply --inTextures vase/backprojected/%d.png --
 build/TextureDomainStitching --in vase/mesh.ply vase/registered/%d.png --mask vase/registered/%d.confidence.png --multi --wType 1 --erode 1 --erodeEps 0.1 --out vase/texture.png
 ```
 
-The result is `vase/texture.png`. `vase/mesh.ply` refers to this texture, so you can view the textured vase in a third-party mesh viewer such as [MeshLab](https://www.meshlab.net/).
+The final texture image is stored in `vase/texture.png`. `vase/mesh.ply` refers to this texture, so you can view the textured vase in a third-party mesh viewer such as [MeshLab](https://www.meshlab.net/).
 
-Below, *Blended* is the confidence-weighted average of the back-projected photographs, without registration or stitching. Because the photographs do not align perfectly on the surface, edges appear doubled and blurred. *Ours* is the result of the three steps above. The bottom row shows close-ups of the two boxes.
+Below, *Blended* is the confidence-weighted average of the back-projected photographs, without registration or stitching. Because the photographs do not align perfectly on the surface, edges appear doubled and blurred. *Ours* is the result of the three steps above. The bottom row shows close-ups of the two boxes. You can also compare them in an interactive 3D viewer on our [project page](https://hliuw.github.io/texture-consolidation/#tc-3d).
 
 <img src="docs/comparison.jpg" width="800" alt="Blended back-projections and our result, with close-ups">
 
