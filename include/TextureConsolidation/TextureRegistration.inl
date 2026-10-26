@@ -46,7 +46,7 @@ std::vector< typename TextureRegistration< Quadrature , Solver >::FlowField > Te
 	const unsigned int n = static_cast< unsigned int >( textureAndConfidences.size() );
 	if( n<2 ) MK_ERROR_OUT( "Expected at least two textures: " , n );
 
-	// Normalize the colors (Alg. 1, lines 1-5)
+	// Normalize the colors
 	std::vector< TextureAndConfidence > normalized = textureAndConfidences;
 	{
 		TextureNormalizer< 32 , Solver , K , Dim > normalizer( _mesh , textureAndConfidences[0].texture.res(0) , textureAndConfidences[0].texture.res(1) );
@@ -58,7 +58,7 @@ std::vector< typename TextureRegistration< Quadrature , Solver >::FlowField > Te
 	}
 	if( _params.verbose ) std::cout << pMeter( "Normalized" ) << std::endl;
 
-	// Initialize the flow-fields to zero (Alg. 1, lines 6-7) and advect the normalized textures along them, eroding the confidences
+	// Initialize the flow-fields to zero and advect the normalized textures along them, eroding the confidences
 	std::vector< FlowField > flows( n , FlowField( _mesh.vertexNum() ) );
 	std::vector< TextureAndConfidence > flowed( n );
 	for( unsigned int i=0 ; i<n ; i++ )
@@ -72,7 +72,7 @@ std::vector< typename TextureRegistration< Quadrature , Solver >::FlowField > Te
 	{
 		Miscellany::PerformanceMeter pMeter( '.' );
 
-		// Select the target: of the pair of textures with largest overlap, the one with larger coverage (Alg. 1, lines 11-14)
+		// Select the target: of the pair of textures with largest overlap, the one with larger coverage
 		unsigned int s=-1 , t=-1;
 		{
 			double maxOverlap = -std::numeric_limits< double >::infinity();
@@ -90,18 +90,18 @@ std::vector< typename TextureRegistration< Quadrature , Solver >::FlowField > Te
 		TextureAndConfidence target = flowed[t];
 		while( true )
 		{
-			// Register the source to the target and update the flow-field of the source (Alg. 1, lines 18-21)
+			// Register the source to the target and update the flow-field of the source
 			FlowField delta = _flow( flowed[s] , target , blurWeight , regularizationWeight );
 			for( size_t v=0 ; v<flows[s].size() ; v++ ) flows[s][v] += delta[v];
 
-			// Advect the normalized source and merge it into the target (Alg. 1, lines 22-24)
+			// Advect the normalized source and merge it into the target
 			flowed[s] = _textureAdvection( flows[s] , normalized[s] );
 			registered.insert( s );
 			order += " " + std::to_string( s );
 			target = StitchByWeightedConfidence( flowed , registered );
 			if( registered.size()==n ) break;
 
-			// Select the next source: the one with the largest overlap with the target (Alg. 1, line 16)
+			// Select the next source: the one with the largest overlap with the target
 			double maxOverlap = -std::numeric_limits< double >::infinity();
 			for( unsigned int i=0 ; i<n ; i++ ) if( registered.find(i)==registered.end() )
 			{
@@ -115,7 +115,7 @@ std::vector< typename TextureRegistration< Quadrature , Solver >::FlowField > Te
 			std::cout << pMeter( "Level " + std::to_string(l) ) << std::endl;
 		}
 
-		// Reduce the smoothing for the next level (Alg. 1, line 25)
+		// Reduce the smoothing for the next level
 		blurWeight *= _params.factor;
 		regularizationWeight *= _params.factor;
 	}
@@ -131,7 +131,7 @@ typename TextureRegistration< Quadrature , Solver >::TextureAndConfidence Textur
 template< unsigned int Quadrature , typename Solver >
 typename TextureRegistration< Quadrature , Solver >::FlowField TextureRegistration< Quadrature , Solver >::_flow( const TextureAndConfidence &source , const TextureAndConfidence &target , double blurWeight , double regularizationWeight )
 {
-	// Blur the source and target, taking confidence into account, sampling them to the vertices (Alg. 1, lines 18-19)
+	// Blur the source and target, taking confidence into account, sampling them to the vertices
 	TextureToVertex< Quadrature , Solver , K , Dim > sourceToVertex( _mesh ) , targetToVertex( _mesh );
 	sourceToVertex.update( blurWeight , &source.confidence );
 	targetToVertex.update( blurWeight , &target.confidence );
@@ -150,7 +150,7 @@ typename TextureRegistration< Quadrature , Solver >::FlowField TextureRegistrati
 {
 	using T = Point< double , Channels >;
 
-	// The flow minimizes the confidence-weighted linearized optical-flow energy (Eq. 8):
+	// The flow minimizes the confidence-weighted linearized optical-flow energy:
 	//		E(V) = \int w * \sum_c [ < \nabla Source[c] , V > - ( Source[c] - Target[c] ) ]^2 + beta_reg * \int || \nabla V ||^2
 	// with w the product of the source and target confidences, giving the system
 	//		( \int w (\nabla Source)(\nabla Source)^T + beta_reg * S ) V = \int w ( Source - Target ) \nabla Source
@@ -215,6 +215,7 @@ typename TextureRegistration< Quadrature , Solver >::FlowField TextureRegistrati
 	for( size_t i=0 ; i<flow.size() ; i++ ) for( unsigned int d=0 ; d<Dim ; d++ ) flow[i][d] = x[i*Dim+d];
 
 	// Rescale the flow by the step size minimizing the (linearized) fitting energy
+	// This is the GetScale operation, see "Motion Graphs for Unstructured Textured Meshes" (Prada et al., 2016)
 	{
 		PhongRodriguesVectorField< K > flowField( _mesh , flow );
 		auto Energy = [&]( size_t sIdx )

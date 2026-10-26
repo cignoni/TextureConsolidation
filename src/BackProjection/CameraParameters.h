@@ -31,16 +31,18 @@ DAMAGE.
 
 #include <string>
 #include <vector>
+#include <fstream>
+#include <sstream>
+#include <cctype>
+#include <cstdlib>
 #include "Misha/Exceptions.h"
 #include "Misha/Geometry.h"
-#include "Misha/CmdLineParser.h"
 
 namespace MishaK
 {
 	// Pinhole camera read from a cameras.json file of the form
 	//   { "frames": [ { "w": W, "h": H, "fx": FX, "fy": FY, "cx": CX, "cy": CY, "w2c": [[...],[...],[...],[...]], "file_path": "image.png" }, ... ] }
-	// The parser is token-based: keys must appear in this order, and brackets/braces must be separated by white-space.
-	// An optional trailing "blender_camera_location" entry per frame is accepted and ignored.
+	// Keys may appear in any order, and other keys are ignored.
 	struct CameraParameters
 	{
 		unsigned int res[2];
@@ -59,205 +61,153 @@ namespace MishaK
 
 		static std::vector< CameraParameters > Read( std::string fileName )
 		{
-			std::vector< CameraParameters > cameraParameters;
-			std::vector< std::string > words = ReadWords( fileName );
-			if( !words.size() || words[0]!=std::string( "{" ) || words.back()!=std::string( "}" ) ) MK_ERROR_OUT( "Poorly formed file: " , fileName );
-			words.erase( words.begin() , words.begin()+1 );
-			words.pop_back();
-			_ReadVector( std::string( "frames" ) , words );
+			std::ifstream file( fileName );
+			if( !file ) MK_ERROR_OUT( "Could not open cameras file: " , fileName );
+			std::stringstream stream;
+			stream << file.rdbuf();
+			std::string text = stream.str();
 
-			while( true )
+			size_t pos = 0;
+			_JSON root = _JSON::Parse( text , pos );
+			_JSON::SkipWhiteSpace( text , pos );
+			if( pos!=text.size() ) MK_ERROR_OUT( "Unexpected content after the JSON object in: " , fileName );
+
+			const _JSON &frames = root.get( "frames" );
+			if( frames.type!=_JSON::ARRAY ) MK_ERROR_OUT( "Expected \"frames\" to be an array" );
+
+			std::vector< CameraParameters > cameraParameters( frames.values.size() );
+			for( size_t i=0 ; i<frames.values.size() ; i++ )
 			{
-				bool hasMore;
-				cameraParameters.push_back( _Read( words , hasMore ) );
-				if( !hasMore ) break;
+				const _JSON &frame = frames.values[i];
+				CameraParameters &param = cameraParameters[i];
+
+				param.res[0] = static_cast< unsigned int >( frame.get( "w" ).toNumber( "w" ) );
+				param.res[1] = static_cast< unsigned int >( frame.get( "h" ).toNumber( "h" ) );
+				param.k(0,0) = frame.get( "fx" ).toNumber( "fx" );
+				param.k(1,1) = frame.get( "fy" ).toNumber( "fy" );
+				param.k(2,0) = frame.get( "cx" ).toNumber( "cx" );
+				param.k(2,1) = frame.get( "cy" ).toNumber( "cy" );
+				param.k(2,2) = 1.;
+
+				const _JSON &w2c = frame.get( "w2c" );
+				if( w2c.type!=_JSON::ARRAY || w2c.values.size()!=4 ) MK_ERROR_OUT( "Expected \"w2c\" to be a 4x4 matrix" );
+				for( unsigned int r=0 ; r<4 ; r++ )
+				{
+					if( w2c.values[r].type!=_JSON::ARRAY || w2c.values[r].values.size()!=4 ) MK_ERROR_OUT( "Expected \"w2c\" to be a 4x4 matrix" );
+					for( unsigned int c=0 ; c<4 ; c++ ) param.w2c(c,r) = w2c.values[r].values[c].toNumber( "w2c" );
+				}
+
+				const _JSON &path = frame.get( "file_path" );
+				if( path.type!=_JSON::STRING ) MK_ERROR_OUT( "Expected \"file_path\" to be a string" );
+				param.path = path.string;
 			}
 			return cameraParameters;
 		}
 
 	protected:
-		static std::string _StripKey( std::string word )
+		// A minimal JSON reader, sufficient for cameras.json
+		struct _JSON
 		{
-			if( word.size()<3 ) MK_ERROR_OUT( "Key too short: " , word );
-			if( word.back()!=':' ) MK_ERROR_OUT( "Key poorly formed: " , word );
-			word.pop_back();
-			if( word[0]!='\"' || word.back()!='\"' ) MK_ERROR_OUT( "Key poorly formed: " , word );
-			return word.substr( 1 , word.size()-2 );
-		};
+			enum Type { NUL , BOOLEAN , NUMBER , STRING , ARRAY , OBJECT };
+			Type type = NUL;
+			double number = 0;
+			std::string string;
+			std::vector< std::string > keys;	// For objects
+			std::vector< _JSON > values;		// For arrays and objects
 
-		static bool _ReadVector( std::string key , std::vector< std::string > & words )
-		{
-			if( words.size()<3 ) MK_ERROR_OUT( "Insufficient words: " , words.size() );
-			std::string _key = _StripKey( words[0] );
-			if( _key!=key ) MK_ERROR_OUT( "Key mismatch: "  , key , " != " , _key );
-			if( words[1]!=std::string( "[" ) ) MK_ERROR_OUT( "Failed to parse vector start: " , words[1] );
-			if( words.back()!=std::string( "]" ) && words.back()!=std::string( "]," ) ) MK_ERROR_OUT( "Failed to parse vector end: " , words.back() );
-			bool end = words.back()==std::string( "]" );
-			words.erase( words.begin() , words.begin()+2 );
-			words.pop_back();
-			return !end;
-		}
-
-		template< typename T >
-		static T _ReadScalar( std::string key , std::vector< std::string > &words , bool & hasMore )
-		{
-			T value;
-
-			if( _StripKey( words[0] )!=key ) MK_ERROR_OUT( "Could not find key: " , key , " <- " , words[0] );
-			words.erase( words.begin() , words.begin()+1 );
-
-			if( words[0].back()==',' )
+			const _JSON &get( const std::string &key ) const
 			{
-				hasMore = true;
-				words[0].pop_back();
+				if( type!=OBJECT ) MK_ERROR_OUT( "Expected an object containing: " , key );
+				for( size_t i=0 ; i<keys.size() ; i++ ) if( keys[i]==key ) return values[i];
+				MK_ERROR_OUT( "Missing key: " , key );
+				return *this;
 			}
-			else hasMore = false;
 
-			try
+			double toNumber( const std::string &key ) const
 			{
-				if      constexpr( std::is_same_v< T , unsigned int > ) value = std::stoi( words[0] );
-				else if constexpr( std::is_same_v< T , double > ) value = std::stod( words[0] );
-				else MK_ERROR_OUT( "Unsupported type: " , typeid(T).name() );
+				if( type!=NUMBER ) MK_ERROR_OUT( "Expected a number for: " , key );
+				return number;
 			}
-			catch( ... ){ MK_ERROR_OUT( "Failed to parse: " , key ); }
-			words.erase( words.begin() , words.begin()+1 );
 
-			return value;
-		}
+			static void SkipWhiteSpace( const std::string &text , size_t &pos ){ while( pos<text.size() && std::isspace( static_cast< unsigned char >( text[pos] ) ) ) pos++; }
 
-		template< unsigned int Dim >
-		static SquareMatrix< double , Dim > _ReadMatrix( std::string key , std::vector< std::string > &words , bool & hasMore )
-		{
-			if( _StripKey( words[0] )!=key ) MK_ERROR_OUT( "Could not find key: " , key , " <- " , words[0] );
-			words.erase( words.begin() , words.begin()+1 );
-
-			SquareMatrix< double , Dim > value;
-
-			if( words[0]!=std::string( "[" ) ) MK_ERROR_OUT( "Failed to parse matrix start: " , words[0] );
-			words.erase( words.begin() , words.begin()+1 );
-
-			for( unsigned int r=0 ; r<Dim ; r++ )
+			static _JSON Parse( const std::string &text , size_t &pos )
 			{
-				if( words[0]!=std::string( "[" ) ) MK_ERROR_OUT( "Failed to parse rows start: " , words[0] );
-				words.erase( words.begin() , words.begin()+1 );
-
-				for( unsigned int c=0 ; c<Dim ; c++ )
+				_JSON value;
+				SkipWhiteSpace( text , pos );
+				if( pos>=text.size() ) MK_ERROR_OUT( "Unexpected end of JSON" );
+				char c = text[pos];
+				if( c=='{' || c=='[' )
 				{
-					if( c+1<Dim )
+					value.type = c=='{' ? OBJECT : ARRAY;
+					char close = c=='{' ? '}' : ']';
+					pos++;
+					SkipWhiteSpace( text , pos );
+					if( pos<text.size() && text[pos]==close ){ pos++ ; return value; }
+					while( true )
 					{
-						if( words[0].back()!=',' ) MK_ERROR_OUT( "Expected more entries" );
-						else words[0].pop_back();
+						if( value.type==OBJECT )
+						{
+							SkipWhiteSpace( text , pos );
+							value.keys.push_back( _ParseString( text , pos ) );
+							SkipWhiteSpace( text , pos );
+							if( pos>=text.size() || text[pos]!=':' ) MK_ERROR_OUT( "Expected ':' after key: " , value.keys.back() );
+							pos++;
+						}
+						value.values.push_back( Parse( text , pos ) );
+						SkipWhiteSpace( text , pos );
+						if( pos>=text.size() ) MK_ERROR_OUT( "Unexpected end of JSON" );
+						if( text[pos]==',' ){ pos++ ; continue; }
+						if( text[pos]==close ){ pos++ ; break; }
+						MK_ERROR_OUT( "Expected ',' or '" , close , "' at position " , pos );
 					}
-					try{ value(c,r) = std::stod( words[0] ); }
-					catch( ... ){ MK_ERROR_OUT( "Failed to parse matrix entry: " , words[0] ); }
-					words.erase( words.begin() , words.begin()+1 );
 				}
-
-				if( r+1<Dim ){ if( words[0]!=std::string( "]," ) ) MK_ERROR_OUT( "Failed to parse rows end: " , words[0] ); }
-				else         { if( words[0]!=std::string( "]" ) ) MK_ERROR_OUT( "Failed to parse rows end: " , words[0] ); }
-				words.erase( words.begin() , words.begin()+1 );
-			}
-
-			if( words[0]!=std::string( "]" ) && words[0]!=std::string( "]," ) ) MK_ERROR_OUT( "Failed to parse matrix end: " , words[0] );
-			hasMore = words[0]==std::string( "]," );
-			words.erase( words.begin() , words.begin()+1 );
-
-			return value;
-		}
-
-		template< unsigned int Dim >
-		static Point< double , Dim > _ReadPoint( std::string key , std::vector< std::string > &words , bool & hasMore )
-		{
-			if( _StripKey( words[0] )!=key ) MK_ERROR_OUT( "Could not find key: " , key , " <- " , words[0] );
-			words.erase( words.begin() , words.begin()+1 );
-
-			Point< double , Dim > value;
-
-			if( words[0]!=std::string( "[" ) ) MK_ERROR_OUT( "Failed to parse point start: " , words[0] );
-			words.erase( words.begin() , words.begin()+1 );
-
-			for( unsigned int c=0 ; c<Dim ; c++ )
-			{
-				if( c+1<Dim )
+				else if( c=='"' ) value.type = STRING , value.string = _ParseString( text , pos );
+				else if( text.compare( pos , 4 , "true" )==0 ) value.type = BOOLEAN , value.number = 1 , pos += 4;
+				else if( text.compare( pos , 5 , "false" )==0 ) value.type = BOOLEAN , value.number = 0 , pos += 5;
+				else if( text.compare( pos , 4 , "null" )==0 ) value.type = NUL , pos += 4;
+				else
 				{
-					if( words[0].back()!=',' ) MK_ERROR_OUT( "Expected more entries" );
-					else words[0].pop_back();
+					const char *start = text.c_str() + pos;
+					char *end;
+					value.type = NUMBER;
+					value.number = std::strtod( start , &end );
+					if( end==start ) MK_ERROR_OUT( "Could not parse JSON value at position " , pos );
+					pos += end - start;
 				}
-				try{ value[c] = std::stod( words[0] ); }
-				catch( ... ){ MK_ERROR_OUT( "Failed to parse point entry: " , words[0] ); }
-				words.erase( words.begin() , words.begin()+1 );
+				return value;
 			}
 
-			if( words[0]!=std::string( "]" ) && words[0]!=std::string( "]," ) ) MK_ERROR_OUT( "Failed to parse point end: " , words[0] );
-			hasMore = words[0]==std::string( "]," );
-			words.erase( words.begin() , words.begin()+1 );
-
-			return value;
-		}
-
-		static std::string _ReadString( std::string key , std::vector< std::string > &words , bool & hasMore )
-		{
-			if( _StripKey( words[0] )!=key ) MK_ERROR_OUT( "Could not find key: " , key , " <- " , words[0] );
-			words.erase( words.begin() , words.begin()+1 );
-
-			if( words[0].back()==',' )
+		protected:
+			static std::string _ParseString( const std::string &text , size_t &pos )
 			{
-				hasMore = true;
-				words[0].pop_back();
+				if( pos>=text.size() || text[pos]!='"' ) MK_ERROR_OUT( "Expected a string at position " , pos );
+				pos++;
+				std::string str;
+				while( pos<text.size() && text[pos]!='"' )
+				{
+					if( text[pos]=='\\' && pos+1<text.size() )
+					{
+						pos++;
+						switch( text[pos] )
+						{
+						case 'n': str += '\n' ; break;
+						case 't': str += '\t' ; break;
+						case 'r': str += '\r' ; break;
+						case 'b': str += '\b' ; break;
+						case 'f': str += '\f' ; break;
+						case 'u': MK_ERROR_OUT( "Unicode escapes are not supported" );
+						default: str += text[pos];
+						}
+					}
+					else str += text[pos];
+					pos++;
+				}
+				if( pos>=text.size() ) MK_ERROR_OUT( "Unterminated string" );
+				pos++;
+				return str;
 			}
-			else hasMore = false;
-
-			if( words[0][0]!='\"' ||  words[0].back()!='\"' ) MK_ERROR_OUT( "String poorly formed: " , words[0] );
-			std::string value = words[0].substr( 1 , words[0].size()-2 );
-			words.erase( words.begin() , words.begin()+1 );
-
-			return value;
-		}
-
-		static CameraParameters _Read( std::vector< std::string > & words , bool & hasMore )
-		{
-			CameraParameters param;
-			bool _hasMore;
-
-			if( words[0]!=std::string( "{" ) ) MK_ERROR_OUT( "Failed to parse parameters start: " , words[0] );
-			words.erase( words.begin() , words.begin()+1 );
-
-			param.res[0] = _ReadScalar< unsigned int >( "w" , words , _hasMore );
-			if( !_hasMore ) MK_ERROR_OUT( "Expected more content" );
-
-			param.res[1] = _ReadScalar< unsigned int >( "h" , words , _hasMore );
-			if( !_hasMore ) MK_ERROR_OUT( "Expected more content" );
-
-			param.k(0,0) = _ReadScalar< double >( "fx" , words , _hasMore );
-			if( !_hasMore ) MK_ERROR_OUT( "Expected more content" );
-
-			param.k(1,1) = _ReadScalar< double >( "fy" , words , _hasMore );
-			if( !_hasMore ) MK_ERROR_OUT( "Expected more content" );
-
-			param.k(2,0) = _ReadScalar< double >( "cx" , words , _hasMore );
-			if( !_hasMore ) MK_ERROR_OUT( "Expected more content" );
-
-			param.k(2,1) = _ReadScalar< double >( "cy" , words , _hasMore );
-			if( !_hasMore ) MK_ERROR_OUT( "Expected more content" );
-
-			param.k(2,2) = 1.;
-
-			param.w2c = _ReadMatrix< 4 >( "w2c" , words , _hasMore );
-			if( !_hasMore ) MK_ERROR_OUT( "Expected more content" );
-
-			param.path = _ReadString( "file_path" , words , _hasMore );
-			if( _hasMore )
-			{
-				_ReadPoint< 3 >( "blender_camera_location" , words , _hasMore );
-				if( _hasMore ) MK_ERROR_OUT( "Did not expect more content" );
-			}
-
-			if( words[0]!=std::string( "}" ) && words[0]!=std::string( "}," ) ) MK_ERROR_OUT( "Failed to parse parameters end: " , words[0] );
-			hasMore = words[0]==std::string( "}," );
-			words.erase( words.begin() , words.begin()+1 );
-
-			return param;
-		}
+		};
 	};
 }
 #endif // CAMERA_PARAMETERS_INCLUDED

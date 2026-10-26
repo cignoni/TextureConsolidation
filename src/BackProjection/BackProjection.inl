@@ -26,7 +26,7 @@ ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF S
 DAMAGE.
 */
 
-// Back-projection of renderings onto a texture-atlased mesh (Sec. 6.1 and App. B of the paper).
+// Back-projection of renderings onto a texture-atlased mesh.
 // For each rendering, produces a texture image (colors sampled from the rendering) and a confidence image
 // (normal alignment times depth-discontinuity falloff, zero for occluded texels, quantized below a cutoff).
 

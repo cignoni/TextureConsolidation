@@ -1,5 +1,7 @@
 # Texture Consolidation
 
+[![Project Page](https://img.shields.io/badge/Project_Page-blue?style=for-the-badge)](https://hliuw.github.io/texture-consolidation/)
+
 Code for the paper [**Texture Consolidation of Generated Multi-View Renderings**](https://TODO-paper-link).
 
 - **Input:** a texture-atlased triangle mesh, and a few renderings or photographs of it with known cameras.
@@ -51,7 +53,7 @@ vcpkg installs libpng, libjpeg and zlib automatically (see `vcpkg.json`). The pr
 
 If you prefer not to use vcpkg, you can install libpng, libjpeg and zlib yourself and tell CMake where they are, e.g. with `-DCMAKE_PREFIX_PATH=<folder containing the libraries>`. CMake finds them with its standard `find_package` modules.
 
-## Data format
+## Input format
 
 A dataset is a folder with three parts:
 
@@ -69,7 +71,8 @@ A dataset is a folder with three parts:
 Views are numbered `0 .. N-1` in the order of `cameras.json`. Files belonging to view `i` are named with a `%d` pattern, e.g. `backprojected/%d.png` means `backprojected/0.png`, `backprojected/1.png`, ...
 
 **Using your own data:** 
-- The parameters of `TextureFlow` depend on the size of the mesh.
+- Cameras follow the OpenCV convention.
+- The parameters of `TextureFlow` depend on the scale of the mesh.
 - `TextureDomainStitching` requires a clean and connected texture atlas. Otherwise it may crash with errors (for example, "Bad components"). If this happens, fixing or regenerating the atlas usually helps.
 
 ## Example run
@@ -122,8 +125,7 @@ Below, *Blended* is the confidence-weighted average of the back-projected photog
 | `--factor` | `0.5` | scaling of $\beta_{blur}$ and $\beta_{reg}$ per level |
 | `--normalization` | `1e-3` | extent of the color normalization ($\epsilon_n$) |
 | `--sub` | `1` | 1-to-4 subdivisions of the mesh |
-| `--erodeR`, `--erodeT` | `1`, `0.2` | erosion of the confidences near their boundary (radius in texels, threshold) |
-| `--minC` | `1e-8` | minimum confidence |
+| `--erode`, `--erodeEps` | `1`, `0.2` | confidence erosion used when computing the flows (see [Confidence erosion](#confidence-erosion)) |
 | `--minStep` | `1e-2` | minimum advection step size |
 
 ### TextureDomainStitching
@@ -135,9 +137,13 @@ See the [TextureSignalProcessing documentation](https://github.com/mkazhdan/Text
 | `--in <mesh> <texture pattern>` and `--mask <confidence pattern>` | the registered textures and confidences |
 | `--multi` | **required**: stitch multiple textures |
 | `--wType 1` | **required**: weight both the value and the gradient terms by confidence |
-| `--erode 1 --erodeEps 0.1` | recommended: ignore unreliable texels at chart boundaries |
+| `--erode 1 --erodeEps 0.1` | recommended: confidence erosion before stitching (see [Confidence erosion](#confidence-erosion)) |
 | `--gWeight` | gradient fitting weight ($\alpha_{gf}$), default `0.01` |
 | `--out` | output texture |
+
+### Confidence erosion
+
+`--erode <radius> --erodeEps <threshold>` zeroes confidences at or below the threshold, and those closer than `radius` texels to them. With `--erode 1`, only the threshold applies. In `TextureFlow`, erosion affects only the flow computation, not the output confidences.
 
 ## Acknowledgements
 

@@ -26,7 +26,7 @@ ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF S
 DAMAGE.
 */
 
-// Registers a set of texture/confidence images to each other with surface optical flow (Sec. 6.1-6.2 of the paper)
+// Registers a set of texture/confidence images to each other with surface optical flow
 // and writes out the registered (advected) textures and confidences.
 
 // Report errors by throwing (caught in main, which returns EXIT_FAILURE) rather than Misha's default of exiting with status 0
@@ -67,15 +67,14 @@ CmdLineParameter< std::string >
 CmdLineParameter< unsigned int >
 	Levels( "levels" , 6 ) ,
 	SubdivisionIterations( "sub" , 1 ) ,
-	ErodeRadius( "erodeR" , 1 );
+	ErodeRadius( "erode" , 1 );
 
 CmdLineParameter< double >
 	BlurWeight( "sDiffusion" , 3e-4 ) ,
 	RegularizationWeight( "sWeight" , 0.5 ) ,
 	Factor( "factor" , 0.5 ) ,
 	NormalizationWeight( "normalization" , 1e-3 ) ,
-	ErodeThreshold( "erodeT" , 0.2 ) ,
-	MinConfidence( "minC" , 1e-8 ) ,
+	ErodeThreshold( "erodeEps" , 0.2 ) ,
 	MinStepSize( "minStep" , 1e-2 );
 
 CmdLineReadable
@@ -96,7 +95,6 @@ std::vector< CmdLineReadable * > params =
 	&SubdivisionIterations ,
 	&ErodeRadius ,
 	&ErodeThreshold ,
-	&MinConfidence ,
 	&MinStepSize ,
 	&Verbose ,
 };
@@ -117,7 +115,6 @@ void ShowUsage( const char* ex )
 	printf( "\t[--%s <planar subdivision iterations>=%d]\n" , SubdivisionIterations.name.c_str() , SubdivisionIterations.value );
 	printf( "\t[--%s <confidence erosion radius, in texels>=%d]\n" , ErodeRadius.name.c_str() , ErodeRadius.value );
 	printf( "\t[--%s <confidence erosion threshold>=%g]\n" , ErodeThreshold.name.c_str() , ErodeThreshold.value );
-	printf( "\t[--%s <minimum output confidence>=%g]\n" , MinConfidence.name.c_str() , MinConfidence.value );
 	printf( "\t[--%s <minimum advection step size>=%g]\n" , MinStepSize.name.c_str() , MinStepSize.value );
 	printf( "\t[--%s]\n" , Verbose.name.c_str() );
 }
@@ -188,11 +185,9 @@ int _main( int argc , char* argv[] )
 	std::vector< Registration::FlowField > flows = registration( textureAndConfidences );
 	if( Verbose.set ) std::cout << pMeter( "Registered" ) << std::endl;
 
-	// Advect the input textures and confidences (clamped from below) along the flows and write them out
+	// Advect the input textures and confidences along the flows and write them out
 	for( unsigned int i=0 ; i<count ; i++ )
 	{
-		RegularGrid< K , double > &confidence = textureAndConfidences[i].confidence;
-		for( size_t j=0 ; j<confidence.size() ; j++ ) confidence[j] = std::max< double >( confidence[j] , MinConfidence.value );
 		Registration::TextureAndConfidence advected = registration.advect( flows[i] , textureAndConfidences[i] , MinStepSize.value );
 		if( OutTextures.set ) WriteTexture( IndexedFileName( OutTextures.value , i ) , advected.texture );
 		if( OutConfidences.set ) WriteConfidenceTexture( IndexedFileName( OutConfidences.value , i ) , advected.confidence );
