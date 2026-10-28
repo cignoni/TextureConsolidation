@@ -1,6 +1,6 @@
 # Texture Consolidation
 
-[![Project Page](https://img.shields.io/badge/Project_Page-blue?style=for-the-badge)](https://hliuw.github.io/texture-consolidation/)
+[![Project Page](https://img.shields.io/badge/Project_Page-blue?style=for-the-badge)](https://hliuw.github.io/texture-consolidation/) [![Paper](https://img.shields.io/badge/Paper-f0883e?style=for-the-badge)](https://arxiv.org/abs/2610.36098)
 
 Code for the paper [**Texture Consolidation of Generated Multi-View Renderings**](https://arxiv.org/abs/2610.36098).
 
