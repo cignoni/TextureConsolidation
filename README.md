@@ -2,7 +2,7 @@
 
 [![Project Page](https://img.shields.io/badge/Project_Page-blue?style=for-the-badge)](https://hliuw.github.io/texture-consolidation/)
 
-Code for the paper [**Texture Consolidation of Generated Multi-View Renderings**](https://TODO-paper-link).
+Code for the paper [**Texture Consolidation of Generated Multi-View Renderings**](https://arxiv.org/abs/2610.36098).
 
 - **Input:** a texture-atlased triangle mesh, and a few renderings or photographs of it with known cameras.
 - **Output:** a single seamless texture image for the mesh.
@@ -49,7 +49,7 @@ cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cm
 cmake --build build --config Release
 ```
 
-vcpkg installs libpng, libjpeg and zlib automatically (see `vcpkg.json`). The programs are in `build/Release/`.
+Replace `<vcpkg>` with the folder where vcpkg is installed. vcpkg should then install libpng, libjpeg and zlib automatically when CMake configures (see `vcpkg.json`). The programs are in `build/Release/`.
 
 If you prefer not to use vcpkg, you can install libpng, libjpeg and zlib yourself and tell CMake where they are, e.g. with `-DCMAKE_PREFIX_PATH=<folder containing the libraries>`. CMake finds them with its standard `find_package` modules.
 
@@ -73,7 +73,7 @@ Views are numbered `0 .. N-1` in the order of `cameras.json`. Files belonging to
 **Using your own data:** 
 - Cameras follow the OpenCV convention.
 - The parameters of `TextureFlow` depend on the scale of the mesh.
-- `TextureDomainStitching` requires a clean and connected texture atlas. Otherwise it may crash with errors (for example, "Bad components"). If this happens, fixing or regenerating the atlas usually helps.
+- `TextureDomainStitching` requires a connected mesh with a clean texture atlas. Otherwise it may crash with errors (for example, "Bad components"). If this happens, fixing the mesh or regenerating the atlas usually helps.
 
 ## Example run
 
@@ -94,7 +94,7 @@ build/TextureDomainStitching --in vase/mesh.ply vase/registered/%d.png --mask va
 
 The final texture image is stored in `vase/texture.png`. `vase/mesh.ply` refers to this texture, so you can view the textured vase in a third-party mesh viewer such as [MeshLab](https://www.meshlab.net/).
 
-Below, *Blended* is the confidence-weighted average of the back-projected photographs, without registration or stitching. Because the photographs do not align perfectly on the surface, edges appear doubled and blurred. *Ours* is the result of the three steps above. The bottom row shows close-ups of the two boxes. You can also compare them in an interactive 3D viewer on our [project page](https://hliuw.github.io/texture-consolidation/#tc-3d).
+Below we show the blended back-projected photographs, and our result after registration and stitching. Note that the ghosting is resolved by registration. You can also compare them in an interactive 3D viewer on our [project page](https://hliuw.github.io/texture-consolidation/#real-photographs).
 
 <img src="docs/comparison.jpg" width="800" alt="Blended back-projections and our result, with close-ups">
 
@@ -137,7 +137,7 @@ See the [TextureSignalProcessing documentation](https://github.com/mkazhdan/Text
 | `--in <mesh> <texture pattern>` and `--mask <confidence pattern>` | the registered textures and confidences |
 | `--multi` | **required**: stitch multiple textures |
 | `--wType 1` | **required**: weight both the value and the gradient terms by confidence |
-| `--erode 1 --erodeEps 0.1` | recommended: confidence erosion before stitching (see [Confidence erosion](#confidence-erosion)) |
+| `--erode 1 --erodeEps 0.1` | confidence erosion (see [Confidence erosion](#confidence-erosion)) |
 | `--gWeight` | gradient fitting weight ($\alpha_{gf}$), default `0.01` |
 | `--out` | output texture |
 
@@ -151,6 +151,16 @@ The vase model and photographs used in the [example run](#example-run) are court
 
 ## Citation
 
+If you find our work useful, please consider citing:
+
 ```bibtex
-TODO
+@misc{liu2026texture,
+  title         = {Texture Consolidation of Generated Multi-View Renderings},
+  author        = {Liu, Hongyi and Wang, Yifan and Kim, Vladimir G. and Kazhdan, Misha},
+  year          = {2026},
+  eprint        = {2610.36098},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.GR},
+  url           = {https://arxiv.org/abs/2610.36098}
+}
 ```
