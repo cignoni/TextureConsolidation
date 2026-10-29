@@ -3,7 +3,7 @@
 	url = https://github.com/cignoni/Misha.git
 [submodule "extern/PhongRodriguesVF"]
 	path = extern/PhongRodriguesVF
-	url = https://github.com/mkazhdan/PhongRodriguesVF.git
+	url = https://github.com/cignoni/PhongRodriguesVF.git
 [submodule "extern/TextureSignalProcessing"]
 	path = extern/TextureSignalProcessing
-	url = https://github.com/mkazhdan/TextureSignalProcessing.git
+	url = https://github.com/cignoni/TextureSignalProcessing.git
